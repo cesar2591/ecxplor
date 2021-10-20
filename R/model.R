@@ -12,26 +12,32 @@
 
 computeRCA <- function(exports_panel) {
 
-    country_exports_panel <- exports_panel %>% group_by(country) %>%
+    country_exports_panel <- exports_panel %>%
+        group_by(country) %>%
         summarize(country_export_val = sum(export_val))
 
-    product_exports_panel <- exports_panel %>% group_by(product) %>%
+    product_exports_panel <- exports_panel %>%
+        group_by(product) %>%
         summarize(product_export_val = sum(export_val))
 
-    country_product_exports_panel <- exports_panel %>% group_by(country, product) %>%
+    country_product_exports_panel <- exports_panel %>%
+        group_by(country, product) %>%
         summarize(export_val = sum(export_val))
 
-    total_exports_panel <- exports_panel %>% summarize(total_export_val = sum(export_val))
+    total_exports_panel <- exports_panel %>%
+        summarize(total_export_val = sum(export_val))
 
     calcs_panel <- country_product_exports_panel %>%
         inner_join(country_exports_panel) %>%
-        inner_join(product_exports_panel) %>% rowwise() %>%
-        mutate(total_export_val = total_exports_panel[[1]]) %>%
+        inner_join(product_exports_panel) %>%
+        rowwise() %>%
+        mutate(total_export_val = sum(total_exports_panel[[2]])) %>%
         mutate(rca_numerator = export_val / country_export_val) %>%
         mutate(rca_denominator = product_export_val / total_export_val) %>%
         mutate(rca = rca_numerator / rca_denominator)
 
-    rca_panel <- calcs_panel %>% select(country, product, rca)
+    rca_panel <- calcs_panel %>%
+        select(country, product, rca)
 
     return(rca_panel)
 
@@ -53,8 +59,11 @@ computeRCA <- function(exports_panel) {
 
 computeComplexity <- function(rca_panel) {
 
-    calcs_panel <- rca_panel %>% mutate(complexity = ifelse(rca > 1.0, 1.0, 0.0))
-    complexity_panel <- calcs_panel %>% select(country, product, complexity)
+    calcs_panel <- rca_panel %>%
+        mutate(complexity = ifelse(rca > 1.0, 1.0, 0.0))
+    complexity_panel <- calcs_panel %>%
+        select(country, product, complexity)
+
     return(complexity_panel)
 
 }
@@ -72,8 +81,11 @@ computeComplexity <- function(rca_panel) {
 
 computeM <- function(complexity_panel) {
 
-    countries_panel <- complexity_panel %>% select(country) %>% distinct()
-    products_panel <- complexity_panel %>% select(product) %>% distinct()
+    countries_panel <- complexity_panel %>%
+        select(country) %>%
+        distinct()
+    products_panel <- complexity_panel[, "product"] %>%
+        distinct()
     names(products_panel) <- "country"
 
     countries <- sort(as.character(countries_panel[[1]]))
@@ -82,23 +94,34 @@ computeM <- function(complexity_panel) {
     n_countries <- length(countries)
     n_products <- length(products)
 
-    country_keys <- as.factor(c(sapply(countries, function(x) {
-        cbind(rep(x, times = n_products))
-    })))
+    country_keys <- as.factor(c(sapply(countries,
+                                       function(x) {
+                                           cbind(rep(x, times = n_products))
+                                           })))
 
     product_keys <- rep(products, times = n_countries)
 
-    keys_panel <- tbl_df(data.frame(country = country_keys, product = product_keys))
-    values_panel <- keys_panel %>% left_join(complexity_panel)
+    keys_panel <- data.frame(country = country_keys,
+                             product = product_keys) %>%
+        tbl_df()
+    values_panel <- keys_panel %>%
+        left_join(complexity_panel)
 
     complexity_vals <- values_panel[["complexity"]]
 
-    raw_m_matrix <- matrix(complexity_vals, nrow = n_countries, ncol = n_products,
-                                    byrow = TRUE, dimnames = list(countries, products))
+    raw_m_matrix <- matrix(complexity_vals,
+                           nrow = n_countries,
+                           ncol = n_products,
+                           byrow = TRUE,
+                           dimnames = list(countries, products))
     raw_m_matrix[is.na(raw_m_matrix)] <- 0
 
-    m_matrix <- raw_m_matrix[, which(!apply(raw_m_matrix, 2, FUN = function(x) { all(x == 0) }))]
-    m_matrix <- raw_m_matrix[which(!apply(raw_m_matrix, 1, FUN = function(x) { all(x == 0) })), ]
+    m_matrix <- raw_m_matrix[, which(!apply(raw_m_matrix,
+                                            2,
+                                            FUN = function(x) { all(x == 0) }))]
+    m_matrix <- raw_m_matrix[which(!apply(raw_m_matrix,
+                                          1,
+                                          FUN = function(x) { all(x == 0) })), ]
 
     return(m_matrix)
 
@@ -162,9 +185,13 @@ computeMTilde <- function(M, diversity_0, ubiquity_0, flag) {
 
     if (flag == "PCI") {
 
-        K_p <- matrix(rep(k_p_0, N_c), nrow = N_p, ncol = N_c,
+        K_p <- matrix(rep(k_p_0, N_c),
+                      nrow = N_p,
+                      ncol = N_c,
                       dimnames = list(products, countries))
-        K_c <- matrix(rep(k_c_0, N_p), nrow = N_c, ncol = N_p,
+        K_c <- matrix(rep(k_c_0, N_p),
+                      nrow = N_c,
+                      ncol = N_p,
                       dimnames = list(countries, products))
 
         M_a <- t(M) / K_p
