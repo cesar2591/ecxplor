@@ -31,7 +31,7 @@ computeRCA <- function(exports_panel) {
         inner_join(country_exports_panel) %>%
         inner_join(product_exports_panel) %>%
         rowwise() %>%
-        mutate(total_export_val = sum(total_exports_panel[[2]])) %>%
+        mutate(total_export_val = total_exports_panel[[1]]) %>%
         mutate(rca_numerator = export_val / country_export_val) %>%
         mutate(rca_denominator = product_export_val / total_export_val) %>%
         mutate(rca = rca_numerator / rca_denominator)
