@@ -6,23 +6,17 @@ library(dplyr)
 
 source("./R/model.R")
 
-exports_panel <- read_csv("C:/Users/Augus/Downloads/world_trade.csv",
-                          col_types = cols(i = col_character(),
-                                           k = col_character())) %>%
-  select(-t) %>%
-  rename(country = i,
-         product = k,
-         export_val = export_value)
-exports_panel
 exports_oec <- read_csv("./data/country_partner_hsproduct4digit_year_2019.csv",
-                     col_types = cols(year = col_integer(),
-                                      export_value = col_double(),
-                                      import_value = col_double(),
-                                      .default = col_character())) %>%
-  select(export_value, location_code, hs_product_code) %>%
+                        col_types = cols(year = col_integer(),
+                                         export_value = col_double(),
+                                         import_value = col_double(),
+                                         .default = col_character())) %>%
   rename(country = location_code,
          product = hs_product_code,
-         export_val = export_value)
+         export_val = export_value) %>%
+  group_by(country, product) %>%
+  summarise(export_val = sum(export_val)) %>%
+  select(export_val, country, product)
 
 products_oec <- read_xlsx("./data/product_oec.xlsx")$`HS4 ID`
 products <- read_xlsx("./data/UN Comtrade Commodity Classifications.xlsx") %>%

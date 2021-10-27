@@ -16,7 +16,10 @@ world_trade2 <- read_csv("./data/WtoData_20211018200240.csv") %>%
   na.omit() %>%
   select(value, country, product)
 
-bi <- balassa_index(world_trade2)
+exports_panel2 <- exports_panel %>%
+  rename(value = export_val)
+exports_panel2
+bi <- balassa_index(exports_panel2)
 bi[1:5, 1:5]
 com_fit <- complexity_measures(bi, method = "eigenvalues")
 com_fit$complexity_index_product
