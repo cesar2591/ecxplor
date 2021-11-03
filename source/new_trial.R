@@ -6,18 +6,6 @@ library(dplyr)
 
 source("./R/model.R")
 
-exports_oec <- read_csv("./data/country_partner_hsproduct4digit_year_2019.csv",
-                        col_types = cols(year = col_integer(),
-                                         export_value = col_double(),
-                                         import_value = col_double(),
-                                         .default = col_character())) %>%
-  rename(country = location_code,
-         product = hs_product_code,
-         export_val = export_value) %>%
-  group_by(country, product) %>%
-  summarise(export_val = sum(export_val)) %>%
-  select(export_val, country, product)
-
 products_oec <- read_xlsx("./data/product_oec.xlsx")$`HS4 ID`
 products <- read_xlsx("./data/UN Comtrade Commodity Classifications.xlsx") %>%
   filter(nchar(Code) == 6) %>%
@@ -26,24 +14,28 @@ products <- read_xlsx("./data/UN Comtrade Commodity Classifications.xlsx") %>%
          parent_code = `Code Parent`,
          description = Description) %>%
   distinct(product, .keep_all = TRUE)
-products
-countries_2019 <- read_csv("./data/countries_2019_oec.csv")$Country
+
+countries_2019 <- read_csv("./data/countries_atlas_1995-2019.csv",
+                           col_types = cols_only(Country = col_character())) %>%
+  left_join(read_csv("./data/country_codes_V202102.csv"),
+            by = "Country") %>%
+  .$country_code
 
 country_codes <- read_csv("./data/country_codes_V202102.csv",
-                          col_types = "ccccc") %>%
-  rename(country = country_name_full)
-
-country_codes[country_codes$country %in% countries_2019, "country"]
+                          col_types = cols(.default = col_character()))
 
 trade_2019 <- read_csv("./data/BACI_HS92_Y2019_V202102.csv",
                        col_types = "dcccdd") %>%
-  rename(year = t,
-         product = k,
-         importer = j,
-         exporter = i,
-         export_val = v,
-         export_qua = q) %>%
-  left_join(products)
+  left_join(products, by = c("k" = "product")) %>%
+  #filter(i %in% countries_2019) %>%
+  left_join(country_codes,
+            by = c("i" = "country_code")) %>%
+  group_by(Country, parent_code) %>%
+  summarise(export_val = sum(v)) %>%
+  ungroup() %>%
+  rename(country = Country,
+         product = parent_code) %>%
+  select(export_val, country, product)
 
 taiwan <- read_csv("./data/exports-2019-taiwan.csv",
                    col_types = "ccccccccd") %>%
@@ -55,6 +47,7 @@ taiwan <- read_csv("./data/exports-2019-taiwan.csv",
          product = substr(product, nchar(product) - 3, nchar(product))) %>%
   group_by(country, product) %>%
   summarise(export_val = sum(export_val)) %>%
+  ungroup() %>%
   select(export_val, country, product) %>%
   filter(product %in% products_oec)
 
@@ -64,8 +57,8 @@ taiwan %>%
   summarise(export_val = sum(export_val))
 
 trade_2019 %>%
-  filter(exporter == "598") %>%
-  group_by(exporter) %>%
+  filter(country == "Dominican Republic") %>%
+  group_by(country) %>%
   summarise(export_val = sum(export_val))
 
 trade_2019 %>%
@@ -85,17 +78,9 @@ trade_2019 %>%
 
 #### Exports Panel ####
 exports_panel <- trade_2019  %>%
-  select(export_val, exporter, parent_code) %>%
-  rename(country_code = exporter,
-         product = parent_code) %>%
-  left_join(country_codes) %>%
-  filter(iso_3digit_alpha %in% countries_oec$iso_3digit_alpha) %>%
-  #       product %in% products_oec) %>%
-  #filter(country_code != "490") %>%
-  group_by(country_code, product) %>%
+  group_by(country, product) %>%
   summarise(export_val = sum(export_val)) %>%
-  rename(country = country_code) %>%
-  select(export_val, country, product)
+  ungroup()
 
 exports_panel <- exports_panel %>%
   rbind(taiwan)
@@ -105,7 +90,7 @@ exports_panel %>%
   summarise(export_val = sum(export_val))
 
 exports_panel %>%
-  filter(product == "6305", country == "DOM") %>%
+  filter(product == "6305", country == "214") %>%
   summarise(export_val = sum(export_val))
 
 #### ECI ####
@@ -140,6 +125,9 @@ pci <- computeRanks(M_tilde_PCI)
 rank_pci <- data.frame(product = names(pci),
                        pci = -pci,
                        rank = rank(pci))
+
+outlook <- computeOutlook(M, pci, d)
+cog <- computeOutlookGain(M, phi, pci, d)
 
 resumen <- left_join(rca_panel, rank_pci, by = "product") %>%
   left_join(exports_panel)

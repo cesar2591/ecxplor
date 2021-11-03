@@ -103,7 +103,7 @@ computeM <- function(complexity_panel) {
 
     keys_panel <- data.frame(country = country_keys,
                              product = product_keys) %>%
-        tbl_df()
+        as_tibble()
     values_panel <- keys_panel %>%
         left_join(complexity_panel)
 
